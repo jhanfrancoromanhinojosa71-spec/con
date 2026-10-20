@@ -1,0 +1,833 @@
+// ======================================
+// MARIO MATEMÁTICO
+// ======================================
+
+// NIVELES Y PREGUNTAS
+
+const niveles = [
+    {
+        nombre: "SUMAS",
+        preguntas: [
+            { texto: "5 + 3", respuesta: 8 },
+            { texto: "10 + 4", respuesta: 14 },
+            { texto: "7 + 2", respuesta: 9 },
+            { texto: "9 + 5", respuesta: 14 },
+            { texto: "6 + 6", respuesta: 12 }
+        ]
+    },
+
+    {
+        nombre: "RESTAS",
+        preguntas: [
+            { texto: "10 - 4", respuesta: 6 },
+            { texto: "15 - 7", respuesta: 8 },
+            { texto: "20 - 5", respuesta: 15 },
+            { texto: "25 - 10", respuesta: 15 },
+            { texto: "30 - 10", respuesta: 20 }
+        ]
+    },
+
+    {
+        nombre: "MULTIPLICACIONES",
+        preguntas: [
+            { texto: "2 × 3", respuesta: 6 },
+            { texto: "4 × 5", respuesta: 20 },
+            { texto: "6 × 4", respuesta: 24 },
+            { texto: "8 × 3", respuesta: 24 },
+            { texto: "6 × 5", respuesta: 30 }
+        ]
+    }
+];
+
+
+// ======================================
+// VARIABLES
+// ======================================
+
+let nivelActual = 0;
+let preguntas = [];
+let actual = 0;
+
+let vidas = 3;
+let puntos = 0;
+
+let x = 50;
+let saltando = false;
+let juegoActivo = false;
+let bloqueado = false;
+
+let moverIzquierda = false;
+let moverDerecha = false;
+
+let posicionSalto = 0;
+let velocidadSalto = 0;
+let ultimaActualizacion = 0;
+
+
+// ======================================
+// ELEMENTOS HTML
+// ======================================
+
+const menuInicio = document.getElementById("menuInicio");
+const juegoCompleto = document.getElementById("juegoCompleto");
+
+const escenario = document.getElementById("juego");
+const mario = document.getElementById("mario");
+
+const preguntaTexto = document.getElementById("pregunta");
+const mensaje = document.getElementById("mensaje");
+
+const vidasTexto = document.getElementById("vidas");
+const puntosTexto = document.getElementById("puntos");
+const nivelTexto = document.getElementById("nivel");
+const etiquetaNivel = document.getElementById("etiquetaNivel");
+
+const bloques = [
+    document.getElementById("b1"),
+    document.getElementById("b2"),
+    document.getElementById("b3")
+];
+
+const pantallaNivel = document.getElementById("nivelCompletado");
+const pantallaGameOver = document.getElementById("gameOver");
+const pantallaFinal = document.getElementById("finalJuego");
+const modalPrincesa = document.getElementById("modal-princesa");
+
+const musica = document.getElementById("musica");
+const sonidoSalto = document.getElementById("sonidoSalto");
+const sonidoCorrecto = document.getElementById("sonidoCorrecto");
+const sonidoBloque = document.getElementById("sonidoBloque");
+const musicaNivel = document.getElementById("musicaNivel");
+const musicaGameOver = document.getElementById("musicaGameOver");
+const musicaFinal = document.getElementById("musicaFinal");
+
+
+// ======================================
+// FUNCIONES DE SONIDO
+// ======================================
+
+function reproducirSonido(audio) {
+    if (!audio) return;
+
+    try {
+        audio.currentTime = 0;
+
+        const reproduccion = audio.play();
+
+        if (reproduccion && reproduccion.catch) {
+            reproduccion.catch(function () {});
+        }
+    } catch (error) {
+        // El juego puede continuar aunque falle el sonido.
+    }
+}
+
+function detenerSonidos() {
+    [
+        musica,
+        musicaNivel,
+        musicaGameOver,
+        musicaFinal
+    ].forEach(function (audio) {
+        if (audio) {
+            audio.pause();
+            audio.currentTime = 0;
+        }
+    });
+}
+
+function reproducirMusicaPrincipal() {
+    if (!musica) return;
+
+    musica.volume = 0.3;
+    reproducirSonido(musica);
+}
+
+
+// ======================================
+// INICIAR JUEGO
+// ======================================
+
+function iniciarJuego() {
+    menuInicio.style.display = "none";
+    juegoCompleto.style.display = "block";
+
+    nivelActual = 0;
+    vidas = 3;
+    puntos = 0;
+    actual = 0;
+
+    x = 50;
+    saltando = false;
+    bloqueado = false;
+
+    juegoActivo = true;
+
+    ocultarPantallas();
+    actualizarInformacion();
+    cargarNivel();
+
+    reproducirMusicaPrincipal();
+
+    mario.style.left = x + "px";
+    mario.style.bottom = "0px";
+}
+
+
+// ======================================
+// OCULTAR TODAS LAS PANTALLAS
+// ======================================
+
+function ocultarPantallas() {
+    pantallaNivel.style.display = "none";
+    pantallaGameOver.style.display = "none";
+    pantallaFinal.style.display = "none";
+    modalPrincesa.style.display = "none";
+}
+
+
+// ======================================
+// CARGAR NIVEL
+// ======================================
+
+function cargarNivel() {
+    if (nivelActual >= niveles.length) {
+        terminarJuego();
+        return;
+    }
+
+    actual = 0;
+
+    preguntas = niveles[nivelActual].preguntas.slice();
+
+    etiquetaNivel.textContent =
+        "NIVEL " + (nivelActual + 1) +
+        " - " + niveles[nivelActual].nombre;
+
+    mensaje.textContent = "¡Encuentra la respuesta correcta!";
+
+    actualizarInformacion();
+    mostrarPregunta();
+}
+
+
+// ======================================
+// MOSTRAR PREGUNTA
+// ======================================
+
+function mostrarPregunta() {
+    if (actual >= preguntas.length) {
+        completarNivel();
+        return;
+    }
+
+    const preguntaActual = preguntas[actual];
+
+    preguntaTexto.textContent =
+        "¿Cuánto es " + preguntaActual.texto + "?";
+
+    mensaje.textContent =
+        "Pregunta " + (actual + 1) +
+        " de " + preguntas.length;
+
+    bloqueado = false;
+
+    colocarRespuestas(preguntaActual.respuesta);
+}
+
+
+// ======================================
+// COLOCAR RESPUESTAS EN LOS BLOQUES
+// ======================================
+
+function colocarRespuestas(respuestaCorrecta) {
+    let respuestas = [respuestaCorrecta];
+
+    while (respuestas.length < 3) {
+        let numeroIncorrecto;
+
+        if (nivelActual === 0) {
+            numeroIncorrecto =
+                respuestaCorrecta +
+                Math.floor(Math.random() * 9) + 1;
+        } else {
+            numeroIncorrecto =
+                respuestaCorrecta +
+                Math.floor(Math.random() * 15) + 1;
+        }
+
+        if (!respuestas.includes(numeroIncorrecto)) {
+            respuestas.push(numeroIncorrecto);
+        }
+    }
+
+    // Mezclar las respuestas para que no aparezcan
+    // siempre en el mismo bloque.
+
+    for (let i = respuestas.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+
+        [respuestas[i], respuestas[j]] =
+            [respuestas[j], respuestas[i]];
+    }
+
+    bloques.forEach(function (bloque, indice) {
+        bloque.textContent = respuestas[indice];
+        bloque.dataset.respuesta = respuestas[indice];
+
+        bloque.style.display = "block";
+        bloque.disabled = false;
+        bloque.style.opacity = "1";
+    });
+}
+
+
+// ======================================
+// RESPONDER AL TOCAR UN BLOQUE
+// ======================================
+
+function seleccionarBloque(indice) {
+    if (!juegoActivo || bloqueado) return;
+
+    if (actual >= preguntas.length) return;
+
+    const respuestaElegida =
+        Number(bloques[indice].dataset.respuesta);
+
+    comprobarRespuesta(respuestaElegida);
+}
+
+
+// ======================================
+// COMPROBAR RESPUESTA
+// ======================================
+
+function comprobarRespuesta(respuestaElegida) {
+    if (!juegoActivo || bloqueado) return;
+
+    bloqueado = true;
+
+    const respuestaCorrecta =
+        preguntas[actual].respuesta;
+
+    if (respuestaElegida === respuestaCorrecta) {
+
+        // RESPUESTA CORRECTA
+
+        puntos += 10;
+
+        mensaje.textContent =
+            "⭐ ¡CORRECTO! Ganaste 10 puntos.";
+
+        reproducirSonido(sonidoCorrecto);
+
+    } else {
+
+        // RESPUESTA INCORRECTA
+
+        vidas--;
+
+        mensaje.textContent =
+            "❌ Respuesta incorrecta. La respuesta era " +
+            respuestaCorrecta + ".";
+
+        reproducirSonido(sonidoBloque);
+    }
+
+    actualizarInformacion();
+
+    if (vidas <= 0) {
+        setTimeout(function () {
+            mostrarGameOver();
+        }, 900);
+
+        return;
+    }
+
+    setTimeout(function () {
+        if (!juegoActivo) return;
+
+        actual++;
+
+        mostrarPregunta();
+
+    }, 1100);
+}
+
+
+// ======================================
+// ACTUALIZAR VIDAS, PUNTOS Y NIVEL
+// ======================================
+
+function actualizarInformacion() {
+    vidasTexto.textContent = vidas;
+    puntosTexto.textContent = puntos;
+    nivelTexto.textContent = nivelActual + 1;
+}
+
+
+// ======================================
+// MOVIMIENTO CON TECLADO
+// ======================================
+
+document.addEventListener("keydown", function (e) {
+
+    if (!juegoActivo) return;
+
+    if (modalPrincesa.style.display === "flex") return;
+
+    if (e.key === "ArrowRight" || e.key === "ArrowLeft") {
+        e.preventDefault();
+    }
+
+    if (e.key === "ArrowRight") {
+        moverDerecha = true;
+    }
+
+    if (e.key === "ArrowLeft") {
+        moverIzquierda = true;
+    }
+
+    if (
+        e.code === "Space" ||
+        e.key === "ArrowUp"
+    ) {
+        e.preventDefault();
+        saltar();
+    }
+});
+
+document.addEventListener("keyup", function (e) {
+
+    if (
+        e.key === "ArrowRight" ||
+        e.key === "ArrowLeft"
+    ) {
+        moverDerecha = false;
+        moverIzquierda = false;
+    }
+});
+
+
+// Evitar que el movimiento continúe si se pierde el foco.
+
+window.addEventListener("blur", function () {
+    moverIzquierda = false;
+    moverDerecha = false;
+});
+
+
+// ======================================
+// BOTONES PARA MOVER A MARIO EN CELULAR
+// ======================================
+
+const btnIzquierda = document.getElementById("btnIzquierda");
+const btnDerecha = document.getElementById("btnDerecha");
+const btnSaltar = document.getElementById("btnSaltar");
+
+
+function activarMovimiento(boton, direccion) {
+
+    boton.addEventListener("pointerdown", function (e) {
+
+        e.preventDefault();
+
+        if (!juegoActivo) return;
+
+        if (direccion === "izquierda") {
+            moverIzquierda = true;
+        }
+
+        if (direccion === "derecha") {
+            moverDerecha = true;
+        }
+    });
+}
+
+
+activarMovimiento(btnIzquierda, "izquierda");
+activarMovimiento(btnDerecha, "derecha");
+
+
+function detenerMovimiento() {
+    moverIzquierda = false;
+    moverDerecha = false;
+}
+
+document.addEventListener("pointerup", detenerMovimiento);
+document.addEventListener("pointercancel", detenerMovimiento);
+
+
+// Botón de salto.
+
+btnSaltar.addEventListener("pointerdown", function (e) {
+
+    e.preventDefault();
+
+    if (!juegoActivo) return;
+
+    saltar();
+});
+
+
+// ======================================
+// ACTUALIZAR MOVIMIENTO
+// ======================================
+
+function actualizarMovimiento() {
+
+    if (juegoActivo) {
+
+        const anchoEscenario = escenario.clientWidth;
+        const anchoMario = mario.offsetWidth;
+
+        const limite = Math.max(
+            0,
+            anchoEscenario - anchoMario
+        );
+
+        if (moverDerecha) {
+            x += 5;
+        }
+
+        if (moverIzquierda) {
+            x -= 5;
+        }
+
+        // Evitar que Mario salga del escenario.
+
+        x = Math.max(0, Math.min(x, limite));
+
+        mario.style.left = x + "px";
+
+        // Actualizar el salto.
+
+        if (saltando) {
+
+            velocidadSalto -= 0.8;
+            posicionSalto += velocidadSalto;
+
+            if (posicionSalto <= 0) {
+                posicionSalto = 0;
+                velocidadSalto = 0;
+                saltando = false;
+            }
+
+            mario.style.bottom = posicionSalto + "px";
+
+            // Comprobar si Mario golpea algún bloque.
+
+            comprobarGolpeDuranteSalto();
+        }
+    }
+
+    requestAnimationFrame(actualizarMovimiento);
+}
+
+
+// ======================================
+// SALTO DE MARIO
+// ======================================
+
+function saltar() {
+
+    if (!juegoActivo || saltando) return;
+
+    saltando = true;
+    posicionSalto = 0;
+    velocidadSalto = 17;
+
+    reproducirSonido(sonidoSalto);
+}
+
+
+// ======================================
+// COMPROBAR SI MARIO GOLPEA UN BLOQUE
+// ======================================
+
+function comprobarGolpeDuranteSalto() {
+
+    if (!saltando || bloqueado || !juegoActivo) return;
+
+    const marioRect = mario.getBoundingClientRect();
+
+    bloques.forEach(function (bloque) {
+
+        if (bloque.style.display === "none") return;
+
+        const bloqueRect = bloque.getBoundingClientRect();
+
+        const hayContacto =
+            marioRect.left < bloqueRect.right &&
+            marioRect.right > bloqueRect.left &&
+            marioRect.top < bloqueRect.bottom &&
+            marioRect.bottom > bloqueRect.top;
+
+        if (hayContacto) {
+
+            const respuesta =
+                Number(bloque.dataset.respuesta);
+
+            comprobarRespuesta(respuesta);
+        }
+    });
+}
+
+
+// ======================================
+// COMPLETAR NIVEL
+// ======================================
+
+function completarNivel() {
+
+    juegoActivo = false;
+
+    detenerMovimiento();
+    detenerSonidos();
+
+    if (nivelActual < niveles.length - 1) {
+
+        pantallaNivel.style.display = "flex";
+
+        reproducirSonido(musicaNivel);
+
+    } else {
+
+        // Completó todos los niveles.
+
+        terminarJuego();
+    }
+}
+
+
+// ======================================
+// PASAR AL SIGUIENTE NIVEL
+// ======================================
+
+function siguienteNivel() {
+
+    nivelActual++;
+
+    if (nivelActual >= niveles.length) {
+        terminarJuego();
+        return;
+    }
+
+    ocultarPantallas();
+
+    x = 50;
+    mario.style.left = x + "px";
+    mario.style.bottom = "0px";
+
+    detenerSonidos();
+
+    juegoActivo = true;
+
+    cargarNivel();
+
+    reproducirMusicaPrincipal();
+}
+
+
+// ======================================
+// GAME OVER
+// ======================================
+
+function mostrarGameOver() {
+
+    juegoActivo = false;
+
+    detenerMovimiento();
+    detenerSonidos();
+
+    pantallaGameOver.style.display = "flex";
+
+    reproducirSonido(musicaGameOver);
+}
+
+
+// ======================================
+// VOLVER A INTENTAR EL NIVEL
+// ======================================
+
+function continuarDesdeNivel() {
+
+    ocultarPantallas();
+    detenerSonidos();
+
+    vidas = 3;
+    actual = 0;
+    x = 50;
+
+    mario.style.left = x + "px";
+    mario.style.bottom = "0px";
+
+    juegoActivo = true;
+
+    actualizarInformacion();
+    cargarNivel();
+
+    reproducirMusicaPrincipal();
+}
+
+
+// ======================================
+// FINAL DEL JUEGO
+// ======================================
+
+function terminarJuego() {
+
+    juegoActivo = false;
+
+    detenerMovimiento();
+    detenerSonidos();
+
+    ocultarPantallas();
+
+    pantallaFinal.style.display = "flex";
+
+    document.getElementById("puntuacionFinal").textContent =
+        "⭐ Puntuación final: " + puntos + " puntos.";
+
+    reproducirSonido(musicaFinal);
+}
+
+
+// ======================================
+// REINICIAR TODO EL JUEGO
+// ======================================
+
+function reiniciarJuego() {
+
+    ocultarPantallas();
+    detenerSonidos();
+
+    nivelActual = 0;
+    actual = 0;
+    vidas = 3;
+    puntos = 0;
+    x = 50;
+
+    saltando = false;
+    posicionSalto = 0;
+    velocidadSalto = 0;
+
+    juegoActivo = true;
+
+    mario.style.left = x + "px";
+    mario.style.bottom = "0px";
+
+    actualizarInformacion();
+    cargarNivel();
+
+    reproducirMusicaPrincipal();
+}
+
+
+// ======================================
+// VOLVER AL MENÚ PRINCIPAL
+// ======================================
+
+function volverAlMenu() {
+
+    juegoActivo = false;
+
+    detenerMovimiento();
+    detenerSonidos();
+    ocultarPantallas();
+
+    juegoCompleto.style.display = "none";
+    menuInicio.style.display = "flex";
+}
+
+
+// ======================================
+// DESAFÍO DE LA PRINCESA
+// ======================================
+
+function preguntarPrincesa() {
+
+    if (!juegoActivo) return;
+
+    document.getElementById("respuestaPrincesa").value = "";
+
+    document.getElementById("mensajePrincesa").textContent =
+        "";
+
+    document.getElementById("preguntaPrincesa").textContent =
+        "¡Mario! Resuelve este desafío: ¿cuánto es 20 × 9?";
+
+    modalPrincesa.style.display = "flex";
+}
+
+
+// ======================================
+// COMPROBAR RESPUESTA DE LA PRINCESA
+// ======================================
+
+function comprobarPrincesa() {
+
+    if (!juegoActivo) return;
+
+    const entrada =
+        document.getElementById("respuestaPrincesa");
+
+    const respuesta = entrada.value.trim();
+
+    const mensajePrincesa =
+        document.getElementById("mensajePrincesa");
+
+    if (respuesta === "") {
+
+        mensajePrincesa.textContent =
+            "Escribe una respuesta primero.";
+
+        return;
+    }
+
+    if (Number(respuesta) === 180) {
+
+        puntos += 50;
+
+        actualizarInformacion();
+
+        mensajePrincesa.textContent =
+            "👑 ¡CORRECTO! Ganaste 50 puntos y salvaste el reino.";
+
+        reproducirSonido(sonidoCorrecto);
+
+        // Desactivar el juego mientras se muestra el resultado.
+
+        juegoActivo = false;
+
+        setTimeout(function () {
+
+            modalPrincesa.style.display = "none";
+
+            terminarJuego();
+
+        }, 1800);
+
+    } else {
+
+        mensajePrincesa.textContent =
+            "❌ Inténtalo otra vez. ¡Tú puedes!";
+    }
+}
+
+
+// ======================================
+// CERRAR EL DESAFÍO DE LA PRINCESA
+// ======================================
+
+function cerrarPrincesa() {
+
+    modalPrincesa.style.display = "none";
+}
+
+
+// ======================================
+// INICIAR EL BUCLE DE MOVIMIENTO
+// ======================================
+
+actualizarMovimiento();
